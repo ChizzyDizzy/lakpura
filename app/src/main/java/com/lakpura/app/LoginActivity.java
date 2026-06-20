@@ -23,17 +23,14 @@ public class LoginActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_login);
 
-        etEmail       = findViewById(R.id.etEmail);
-        etPassword    = findViewById(R.id.etPassword);
-        btnLogin      = findViewById(R.id.btnLogin);
-        progressBar   = findViewById(R.id.progressBar);
+        etEmail        = findViewById(R.id.etEmail);
+        etPassword     = findViewById(R.id.etPassword);
+        btnLogin       = findViewById(R.id.btnLogin);
+        progressBar    = findViewById(R.id.progressBar);
         tvGoToRegister = findViewById(R.id.tvGoToRegister);
 
         btnLogin.setOnClickListener(v -> attemptLogin());
-
-        tvGoToRegister.setOnClickListener(v -> {
-            startActivity(new Intent(this, RegisterActivity.class));
-        });
+        tvGoToRegister.setOnClickListener(v -> startActivity(new Intent(this, RegisterActivity.class)));
     }
 
     private void attemptLogin() {
@@ -50,9 +47,16 @@ public class LoginActivity extends AppCompatActivity {
         AuthHelper.login(email, password, new AuthHelper.AuthCallback() {
             @Override
             public void onSuccess(String message) {
-                setLoading(false);
-                startActivity(new Intent(LoginActivity.this, HomeActivity.class));
-                finish();
+                // After login, check if this user is an admin
+                AuthHelper.checkIsAdmin(isAdmin -> {
+                    setLoading(false);
+                    if (isAdmin) {
+                        startActivity(new Intent(LoginActivity.this, AdminActivity.class));
+                    } else {
+                        startActivity(new Intent(LoginActivity.this, HomeActivity.class));
+                    }
+                    finish();
+                });
             }
 
             @Override
