@@ -272,6 +272,110 @@ public class AuthHelper {
     }
 
     // -------------------------------------------------------------------------
+    // Create a new user (called by admin) — uses signup endpoint with admin's key
+    // -------------------------------------------------------------------------
+    public static void createUser(String email, String password, String fullName, boolean makeAdmin, AuthCallback callback) {
+        executor.execute(() -> {
+            try {
+                // Step 1: sign up the new user
+                JsonObject body = new JsonObject();
+                body.addProperty("email", email);
+                body.addProperty("password", password);
+
+                Request signupRequest = new Request.Builder()
+                        .url(SupabaseClient.PROJECT_URL + "/auth/v1/signup")
+                        .addHeader("apikey", SupabaseClient.ANON_KEY)
+                        .addHeader("Content-Type", "application/json")
+                        .post(RequestBody.create(body.toString(), JSON))
+                        .build();
+
+                Response signupResponse = client.newCall(signupRequest).execute();
+                String signupBody = signupResponse.body().string();
+
+                if (!signupResponse.isSuccessful()) {
+                    mainHandler.post(() -> callback.onError(extractError(signupBody)));
+                    return;
+                }
+
+                JsonObject json = JsonParser.parseString(signupBody).getAsJsonObject();
+
+                // Get new user's id and token
+                String newUserId = null;
+                String newUserToken = null;
+
+                if (json.has("id")) {
+                    newUserId = json.get("id").getAsString();
+                } else if (json.has("user") && !json.get("user").isJsonNull()) {
+                    newUserId = json.getAsJsonObject("user").get("id").getAsString();
+                }
+
+                if (json.has("access_token")) {
+                    newUserToken = json.get("access_token").getAsString();
+                } else if (json.has("session") && !json.get("session").isJsonNull()) {
+                    newUserToken = json.getAsJsonObject("session").get("access_token").getAsString();
+                }
+
+                if (newUserId == null) {
+                    mainHandler.post(() -> callback.onError("Could not retrieve new user ID."));
+                    return;
+                }
+
+                // Step 2: insert profile using new user's token (if available) or admin's token
+                String tokenToUse = newUserToken != null ? newUserToken : accessToken;
+
+                JsonObject profile = new JsonObject();
+                profile.addProperty("id", newUserId);
+                profile.addProperty("full_name", fullName);
+                profile.addProperty("email", email);
+                profile.addProperty("is_admin", makeAdmin);
+
+                Request profileRequest = new Request.Builder()
+                        .url(SupabaseClient.PROJECT_URL + "/rest/v1/profiles")
+                        .addHeader("apikey", SupabaseClient.ANON_KEY)
+                        .addHeader("Authorization", "Bearer " + tokenToUse)
+                        .addHeader("Content-Type", "application/json")
+                        .addHeader("Prefer", "return=minimal")
+                        .post(RequestBody.create(profile.toString(), JSON))
+                        .build();
+
+                client.newCall(profileRequest).execute();
+
+                // Step 3: if token was from new user but makeAdmin=true, update via admin token
+                if (makeAdmin && newUserToken != null) {
+                    updateAdminFlag(newUserId, true);
+                }
+
+                String role = makeAdmin ? "Admin" : "Standard User";
+                mainHandler.post(() -> callback.onSuccess("User created successfully as " + role + "!"));
+
+            } catch (IOException e) {
+                mainHandler.post(() -> callback.onError("Network error: " + e.getMessage()));
+            }
+        });
+    }
+
+    // -------------------------------------------------------------------------
+    // Update is_admin flag for a user (admin only)
+    // -------------------------------------------------------------------------
+    private static void updateAdminFlag(String userId, boolean isAdmin) {
+        try {
+            JsonObject body = new JsonObject();
+            body.addProperty("is_admin", isAdmin);
+
+            Request request = new Request.Builder()
+                    .url(SupabaseClient.PROJECT_URL + "/rest/v1/profiles?id=eq." + userId)
+                    .addHeader("apikey", SupabaseClient.ANON_KEY)
+                    .addHeader("Authorization", "Bearer " + accessToken)
+                    .addHeader("Content-Type", "application/json")
+                    .addHeader("Prefer", "return=minimal")
+                    .patch(RequestBody.create(body.toString(), JSON))
+                    .build();
+
+            client.newCall(request).execute();
+        } catch (IOException ignored) {}
+    }
+
+    // -------------------------------------------------------------------------
     // Logout
     // -------------------------------------------------------------------------
     public static void logout() {
