@@ -14,7 +14,7 @@ import androidx.appcompat.app.AppCompatActivity;
 public class LoginActivity extends AppCompatActivity {
 
     private EditText etEmail, etPassword;
-    private Button btnLogin;
+    private Button btnLogin, btnAdminLogin;
     private ProgressBar progressBar;
     private TextView tvGoToRegister;
 
@@ -26,14 +26,16 @@ public class LoginActivity extends AppCompatActivity {
         etEmail        = findViewById(R.id.etEmail);
         etPassword     = findViewById(R.id.etPassword);
         btnLogin       = findViewById(R.id.btnLogin);
+        btnAdminLogin  = findViewById(R.id.btnAdminLogin);
         progressBar    = findViewById(R.id.progressBar);
         tvGoToRegister = findViewById(R.id.tvGoToRegister);
 
-        btnLogin.setOnClickListener(v -> attemptLogin());
+        btnLogin.setOnClickListener(v -> attemptLogin(false));
+        btnAdminLogin.setOnClickListener(v -> attemptLogin(true));
         tvGoToRegister.setOnClickListener(v -> startActivity(new Intent(this, RegisterActivity.class)));
     }
 
-    private void attemptLogin() {
+    private void attemptLogin(boolean goToAdmin) {
         String email    = etEmail.getText().toString().trim();
         String password = etPassword.getText().toString().trim();
 
@@ -47,16 +49,13 @@ public class LoginActivity extends AppCompatActivity {
         AuthHelper.login(email, password, new AuthHelper.AuthCallback() {
             @Override
             public void onSuccess(String message) {
-                // After login, check if this user is an admin
-                AuthHelper.checkIsAdmin(isAdmin -> {
-                    setLoading(false);
-                    if (isAdmin) {
-                        startActivity(new Intent(LoginActivity.this, AdminActivity.class));
-                    } else {
-                        startActivity(new Intent(LoginActivity.this, HomeActivity.class));
-                    }
-                    finish();
-                });
+                setLoading(false);
+                if (goToAdmin) {
+                    startActivity(new Intent(LoginActivity.this, AdminActivity.class));
+                } else {
+                    startActivity(new Intent(LoginActivity.this, HomeActivity.class));
+                }
+                finish();
             }
 
             @Override
@@ -70,5 +69,6 @@ public class LoginActivity extends AppCompatActivity {
     private void setLoading(boolean loading) {
         progressBar.setVisibility(loading ? View.VISIBLE : View.GONE);
         btnLogin.setEnabled(!loading);
+        btnAdminLogin.setEnabled(!loading);
     }
 }
