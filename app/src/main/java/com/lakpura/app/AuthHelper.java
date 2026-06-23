@@ -218,6 +218,53 @@ public class AuthHelper {
     // Send email notification via Brevo to a list of recipients
     // -------------------------------------------------------------------------
     // -------------------------------------------------------------------------
+    // Get user count (for admin panel display)
+    // -------------------------------------------------------------------------
+    public interface UserCountCallback {
+        void onResult(int count);
+        void onError(String error);
+    }
+
+    public static void getUserCount(UserCountCallback callback) {
+        executor.execute(() -> {
+            try {
+                Request request = new Request.Builder()
+                        .url(SupabaseClient.PROJECT_URL + "/rest/v1/profiles?select=id")
+                        .addHeader("apikey", SupabaseClient.ANON_KEY)
+                        .addHeader("Authorization", "Bearer " + accessToken)
+                        .addHeader("Prefer", "count=exact")
+                        .get()
+                        .build();
+
+                Response response = client.newCall(request).execute();
+                String countHeader = response.header("content-range");
+                int count = 0;
+                if (countHeader != null && countHeader.contains("/")) {
+                    try { count = Integer.parseInt(countHeader.split("/")[1]); } catch (Exception ignored) {}
+                }
+                int finalCount = count;
+                mainHandler.post(() -> callback.onResult(finalCount));
+            } catch (IOException e) {
+                mainHandler.post(() -> callback.onError(e.getMessage()));
+            }
+        });
+    }
+
+    // -------------------------------------------------------------------------
+    // Send in-app only notification (saves to Supabase, no email)
+    // -------------------------------------------------------------------------
+    public static void sendInAppNotification(String subject, String message, AuthCallback callback) {
+        executor.execute(() -> {
+            boolean saved = logNotification(subject, message);
+            if (saved) {
+                mainHandler.post(() -> callback.onSuccess("Notification sent successfully!"));
+            } else {
+                mainHandler.post(() -> callback.onError("Failed to send notification. Check your connection."));
+            }
+        });
+    }
+
+    // -------------------------------------------------------------------------
     // Send in-app notification (saves to Supabase) + optional email via Brevo
     // -------------------------------------------------------------------------
     public static void sendNotification(List<String> emails, String subject, String message, AuthCallback callback) {

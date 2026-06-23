@@ -12,8 +12,6 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
-import java.util.List;
-
 public class AdminActivity extends AppCompatActivity {
 
     // Notification fields
@@ -30,8 +28,6 @@ public class AdminActivity extends AppCompatActivity {
 
     // Logout
     private Button btnLogout;
-
-    private List<String> allEmails;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -67,21 +63,20 @@ public class AdminActivity extends AppCompatActivity {
     // Notifications
     // -----------------------------------------------------------------------
     private void loadRecipients() {
-        tvRecipientCount.setText("Loading recipients...");
+        tvRecipientCount.setText("Loading...");
         btnSend.setEnabled(false);
 
-        AuthHelper.getAllUserEmails(new AuthHelper.EmailListCallback() {
+        AuthHelper.getUserCount(new AuthHelper.UserCountCallback() {
             @Override
-            public void onSuccess(List<String> emails) {
-                allEmails = emails;
-                tvRecipientCount.setText(emails.size() + " registered users will receive this");
+            public void onResult(int count) {
+                tvRecipientCount.setText(count + " registered users will receive this");
                 btnSend.setEnabled(true);
             }
 
             @Override
             public void onError(String error) {
-                tvRecipientCount.setText("Could not load recipients");
-                Toast.makeText(AdminActivity.this, error, Toast.LENGTH_LONG).show();
+                tvRecipientCount.setText("Ready to send");
+                btnSend.setEnabled(true);
             }
         });
     }
@@ -94,20 +89,16 @@ public class AdminActivity extends AppCompatActivity {
             Toast.makeText(this, "Please fill in subject and message", Toast.LENGTH_SHORT).show();
             return;
         }
-        if (allEmails == null || allEmails.isEmpty()) {
-            Toast.makeText(this, "No recipients found", Toast.LENGTH_SHORT).show();
-            return;
-        }
 
         progressBarNotif.setVisibility(View.VISIBLE);
         btnSend.setEnabled(false);
 
-        AuthHelper.sendNotification(allEmails, subject, message, new AuthHelper.AuthCallback() {
+        AuthHelper.sendInAppNotification(subject, message, new AuthHelper.AuthCallback() {
             @Override
             public void onSuccess(String msg) {
                 progressBarNotif.setVisibility(View.GONE);
                 btnSend.setEnabled(true);
-                tvSentLog.setText("Last sent: \"" + subject + "\" → " + allEmails.size() + " users");
+                tvSentLog.setText("Last sent: \"" + subject + "\"");
                 etSubject.setText("");
                 etMessage.setText("");
                 Toast.makeText(AdminActivity.this, msg, Toast.LENGTH_LONG).show();

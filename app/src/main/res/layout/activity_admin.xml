@@ -69,7 +69,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Send Email Notification"
+                    android:text="Send In-App Notification"
                     android:textSize="17sp"
                     android:textStyle="bold"
                     android:textColor="@color/text_primary"
@@ -129,7 +129,7 @@
                     android:id="@+id/btnSend"
                     android:layout_width="match_parent"
                     android:layout_height="52dp"
-                    android:text="Send to All Users"
+                    android:text="Send Notification"
                     android:textSize="15sp"
                     android:backgroundTint="@color/primary"
                     android:enabled="false"
