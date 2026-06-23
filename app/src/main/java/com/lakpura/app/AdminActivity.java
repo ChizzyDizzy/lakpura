@@ -102,7 +102,7 @@ public class AdminActivity extends AppCompatActivity {
         progressBarNotif.setVisibility(View.VISIBLE);
         btnSend.setEnabled(false);
 
-        AuthHelper.sendEmailNotification(allEmails, subject, message, new AuthHelper.AuthCallback() {
+        AuthHelper.sendNotification(allEmails, subject, message, new AuthHelper.AuthCallback() {
             @Override
             public void onSuccess(String msg) {
                 progressBarNotif.setVisibility(View.GONE);

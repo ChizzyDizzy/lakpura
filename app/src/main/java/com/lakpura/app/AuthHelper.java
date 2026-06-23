@@ -217,10 +217,20 @@ public class AuthHelper {
     // -------------------------------------------------------------------------
     // Send email notification via Brevo to a list of recipients
     // -------------------------------------------------------------------------
-    public static void sendEmailNotification(List<String> emails, String subject, String message, AuthCallback callback) {
+    // -------------------------------------------------------------------------
+    // Send in-app notification (saves to Supabase) + optional email via Brevo
+    // -------------------------------------------------------------------------
+    public static void sendNotification(List<String> emails, String subject, String message, AuthCallback callback) {
         executor.execute(() -> {
+            // Step 1: always save to Supabase first so in-app works regardless of email
+            boolean saved = logNotification(subject, message);
+            if (!saved) {
+                mainHandler.post(() -> callback.onError("Failed to save notification. Check your connection."));
+                return;
+            }
+
+            // Step 2: try sending email via Brevo — if it fails, still report success for in-app
             try {
-                // Build recipient array
                 JsonArray toArray = new JsonArray();
                 for (String email : emails) {
                     JsonObject recipient = new JsonObject();
@@ -228,12 +238,10 @@ public class AuthHelper {
                     toArray.add(recipient);
                 }
 
-                // Sender
                 JsonObject sender = new JsonObject();
                 sender.addProperty("name", SupabaseClient.BREVO_SENDER_NAME);
                 sender.addProperty("email", SupabaseClient.BREVO_SENDER_EMAIL);
 
-                // Body
                 JsonObject body = new JsonObject();
                 body.add("sender", sender);
                 body.add("to", toArray);
@@ -241,7 +249,7 @@ public class AuthHelper {
                 body.addProperty("htmlContent",
                         "<div style='font-family:sans-serif;padding:20px'>"
                         + "<h2>" + subject + "</h2>"
-                        + "<p>" + message + "</p>"
+                        + "<p>" + message.replace("\n", "<br>") + "</p>"
                         + "<hr><small>Sent via Lakpura App</small>"
                         + "</div>");
 
@@ -256,19 +264,73 @@ public class AuthHelper {
                 String responseBody = response.body().string();
 
                 if (!response.isSuccessful()) {
-                    mainHandler.post(() -> callback.onError("Email failed: " + responseBody));
+                    // In-app saved fine, email failed — report partial success
+                    mainHandler.post(() -> callback.onSuccess(
+                        "Notification saved! (" + emails.size() + " users can see it in-app)\nEmail delivery failed: " + extractError(responseBody)));
+                } else {
+                    mainHandler.post(() -> callback.onSuccess(
+                        "Notification sent to " + emails.size() + " users via email and in-app!"));
+                }
+
+            } catch (IOException e) {
+                // In-app saved fine, email had network error
+                mainHandler.post(() -> callback.onSuccess(
+                    "Notification saved in-app! Email could not be sent: " + e.getMessage()));
+            }
+        });
+    }
+
+    // -------------------------------------------------------------------------
+    // Get all notifications (for users to view)
+    // -------------------------------------------------------------------------
+    public static void getNotifications(NotificationsCallback callback) {
+        executor.execute(() -> {
+            try {
+                Request request = new Request.Builder()
+                        .url(SupabaseClient.PROJECT_URL + "/rest/v1/notifications?select=subject,message,sent_at&order=sent_at.desc")
+                        .addHeader("apikey", SupabaseClient.ANON_KEY)
+                        .addHeader("Authorization", "Bearer " + accessToken)
+                        .get()
+                        .build();
+
+                Response response = client.newCall(request).execute();
+                String responseBody = response.body().string();
+
+                if (!response.isSuccessful()) {
+                    mainHandler.post(() -> callback.onError("Could not load notifications"));
                     return;
                 }
 
-                // Log notification to Supabase
-                logNotification(subject, message);
+                JsonArray arr = JsonParser.parseString(responseBody).getAsJsonArray();
+                List<NotificationItem> items = new ArrayList<>();
+                for (JsonElement el : arr) {
+                    JsonObject obj = el.getAsJsonObject();
+                    String s = obj.has("subject") ? obj.get("subject").getAsString() : "";
+                    String m = obj.has("message") ? obj.get("message").getAsString() : "";
+                    String t = obj.has("sent_at") ? obj.get("sent_at").getAsString() : "";
+                    items.add(new NotificationItem(s, m, t));
+                }
 
-                mainHandler.post(() -> callback.onSuccess("Notification sent to " + emails.size() + " users!"));
+                mainHandler.post(() -> callback.onSuccess(items));
 
             } catch (IOException e) {
                 mainHandler.post(() -> callback.onError("Network error: " + e.getMessage()));
             }
         });
+    }
+
+    public interface NotificationsCallback {
+        void onSuccess(List<NotificationItem> items);
+        void onError(String error);
+    }
+
+    public static class NotificationItem {
+        public String subject, message, sentAt;
+        public NotificationItem(String subject, String message, String sentAt) {
+            this.subject = subject;
+            this.message = message;
+            this.sentAt  = sentAt;
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -407,7 +469,7 @@ public class AuthHelper {
         } catch (IOException ignored) {}
     }
 
-    private static void logNotification(String subject, String message) {
+    private static boolean logNotification(String subject, String message) {
         try {
             JsonObject log = new JsonObject();
             log.addProperty("subject", subject);
@@ -422,8 +484,11 @@ public class AuthHelper {
                     .post(RequestBody.create(log.toString(), JSON))
                     .build();
 
-            client.newCall(request).execute();
-        } catch (IOException ignored) {}
+            Response response = client.newCall(request).execute();
+            return response.isSuccessful();
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     private static String getCurrentUserId() {

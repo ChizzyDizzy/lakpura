@@ -14,14 +14,16 @@ public class HomeActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_home);
 
-        TextView tvWelcome = findViewById(R.id.tvWelcome);
-        Button btnLogout   = findViewById(R.id.btnLogout);
+        TextView tvWelcome        = findViewById(R.id.tvWelcome);
+        Button btnLogout          = findViewById(R.id.btnLogout);
+        Button btnNotifications   = findViewById(R.id.btnNotifications);
 
         String email = AuthHelper.currentUserEmail != null
-                ? AuthHelper.currentUserEmail
-                : "User";
-
+                ? AuthHelper.currentUserEmail : "User";
         tvWelcome.setText("Welcome,\n" + email + "!");
+
+        btnNotifications.setOnClickListener(v ->
+                startActivity(new Intent(this, NotificationsActivity.class)));
 
         btnLogout.setOnClickListener(v -> {
             AuthHelper.logout();
@@ -31,9 +33,6 @@ public class HomeActivity extends AppCompatActivity {
         });
     }
 
-    // Prevent going back to login when already logged in
     @Override
-    public void onBackPressed() {
-        // Do nothing — user must use logout button
-    }
+    public void onBackPressed() {}
 }
