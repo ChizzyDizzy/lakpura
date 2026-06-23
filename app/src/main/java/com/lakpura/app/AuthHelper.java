@@ -265,9 +265,9 @@ public class AuthHelper {
     // -------------------------------------------------------------------------
     public static void sendInAppNotification(String subject, String message, AuthCallback callback) {
         executor.execute(() -> {
-            boolean saved = logNotification(subject, message);
-            if (!saved) {
-                mainHandler.post(() -> callback.onError("Failed to send notification. Check your connection."));
+            String saveError = logNotificationWithError(subject, message);
+            if (saveError != null) {
+                mainHandler.post(() -> callback.onError("Save failed: " + saveError));
                 return;
             }
             // Send FCM push to all subscribed devices
@@ -628,7 +628,14 @@ public class AuthHelper {
     }
 
     private static boolean logNotification(String subject, String message) {
+        return logNotificationWithError(subject, message) == null;
+    }
+
+    // Returns null on success, error string on failure
+    private static String logNotificationWithError(String subject, String message) {
         try {
+            if (accessToken == null) return "Not logged in (no access token)";
+
             JsonObject log = new JsonObject();
             log.addProperty("subject", subject);
             log.addProperty("message", message);
@@ -643,9 +650,11 @@ public class AuthHelper {
                     .build();
 
             Response response = client.newCall(request).execute();
-            return response.isSuccessful();
+            if (response.isSuccessful()) return null;
+            String body = response.body() != null ? response.body().string() : "no body";
+            return "HTTP " + response.code() + ": " + body;
         } catch (IOException e) {
-            return false;
+            return "Network: " + e.getMessage();
         }
     }
 
