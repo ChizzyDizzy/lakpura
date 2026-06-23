@@ -1,4 +1,4 @@
-package com.lakpura.app;
+package com.lakpura;
 
 public class SupabaseClient {
     public static final String PROJECT_URL        = "YOUR_SUPABASE_PROJECT_URL";

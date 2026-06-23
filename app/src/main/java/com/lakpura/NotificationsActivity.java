@@ -1,4 +1,4 @@
-package com.lakpura.app;
+package com.lakpura;
 
 import android.os.Bundle;
 import android.view.View;

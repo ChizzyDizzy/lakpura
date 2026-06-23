@@ -1,4 +1,4 @@
-package com.lakpura.app;
+package com.lakpura;
 
 import android.app.NotificationChannel;
 import android.app.NotificationManager;

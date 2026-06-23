@@ -4,15 +4,15 @@ plugins {
 }
 
 android {
-    namespace 'com.lakpura.app'
+    namespace 'com.lakpura'
     compileSdk 34
 
     defaultConfig {
-        applicationId "com.lakpura.app"
+        applicationId "com.lakpura"
         minSdk 24
         targetSdk 34
-        versionCode 1
-        versionName "1.0"
+        versionCode 26
+        versionName "2.6"
     }
 
     buildTypes {
