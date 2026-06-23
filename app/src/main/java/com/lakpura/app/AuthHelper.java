@@ -2,6 +2,7 @@ package com.lakpura.app;
 
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Base64;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -9,6 +10,11 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.KeyFactory;
+import java.security.PrivateKey;
+import java.security.Signature;
+import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -128,6 +134,10 @@ public class AuthHelper {
                 JsonObject json = JsonParser.parseString(responseBody).getAsJsonObject();
                 accessToken = json.get("access_token").getAsString();
                 currentUserEmail = email;
+
+                // Subscribe this device to FCM topic for push notifications
+                com.google.firebase.messaging.FirebaseMessaging.getInstance()
+                        .subscribeToTopic("lakpura_all");
 
                 mainHandler.post(() -> callback.onSuccess("Login successful!"));
 
@@ -256,12 +266,113 @@ public class AuthHelper {
     public static void sendInAppNotification(String subject, String message, AuthCallback callback) {
         executor.execute(() -> {
             boolean saved = logNotification(subject, message);
-            if (saved) {
-                mainHandler.post(() -> callback.onSuccess("Notification sent successfully!"));
-            } else {
+            if (!saved) {
                 mainHandler.post(() -> callback.onError("Failed to send notification. Check your connection."));
+                return;
             }
+            // Send FCM push to all subscribed devices
+            sendFcmTopicMessage(subject, message);
+            mainHandler.post(() -> callback.onSuccess("Notification sent to all users!"));
         });
+    }
+
+    // -------------------------------------------------------------------------
+    // Send FCM push via V1 API to topic "lakpura_all"
+    // -------------------------------------------------------------------------
+    private static void sendFcmTopicMessage(String title, String body) {
+        try {
+            String oauthToken = getFcmOauthToken();
+            if (oauthToken == null) return;
+
+            JsonObject notification = new JsonObject();
+            notification.addProperty("title", title);
+            notification.addProperty("body", body);
+
+            JsonObject androidConfig = new JsonObject();
+            JsonObject androidNotification = new JsonObject();
+            androidNotification.addProperty("channel_id", "lakpura_notifications");
+            androidConfig.add("notification", androidNotification);
+            androidConfig.addProperty("priority", "high");
+
+            JsonObject msg = new JsonObject();
+            msg.addProperty("topic", "lakpura_all");
+            msg.add("notification", notification);
+            msg.add("android", androidConfig);
+
+            JsonObject payload = new JsonObject();
+            payload.add("message", msg);
+
+            String fcmUrl = "https://fcm.googleapis.com/v1/projects/"
+                    + SupabaseClient.FCM_PROJECT_ID + "/messages:send";
+
+            Request request = new Request.Builder()
+                    .url(fcmUrl)
+                    .addHeader("Authorization", "Bearer " + oauthToken)
+                    .addHeader("Content-Type", "application/json")
+                    .post(RequestBody.create(payload.toString(), JSON))
+                    .build();
+
+            client.newCall(request).execute();
+        } catch (Exception ignored) {}
+    }
+
+    // Build a short-lived OAuth2 token from the service account private key
+    private static String getFcmOauthToken() {
+        try {
+            long now = System.currentTimeMillis() / 1000L;
+
+            // JWT header
+            String header = Base64.encodeToString(
+                    "{\"alg\":\"RS256\",\"typ\":\"JWT\"}".getBytes(StandardCharsets.UTF_8),
+                    Base64.URL_SAFE | Base64.NO_PADDING | Base64.NO_WRAP);
+
+            // JWT claim set
+            JsonObject claims = new JsonObject();
+            claims.addProperty("iss", SupabaseClient.FCM_CLIENT_EMAIL);
+            claims.addProperty("scope", "https://www.googleapis.com/auth/firebase.messaging");
+            claims.addProperty("aud", "https://oauth2.googleapis.com/token");
+            claims.addProperty("iat", now);
+            claims.addProperty("exp", now + 3600);
+            String claimSet = Base64.encodeToString(
+                    claims.toString().getBytes(StandardCharsets.UTF_8),
+                    Base64.URL_SAFE | Base64.NO_PADDING | Base64.NO_WRAP);
+
+            // Sign
+            String signingInput = header + "." + claimSet;
+            String rawKey = SupabaseClient.FCM_PRIVATE_KEY
+                    .replace("-----BEGIN PRIVATE KEY-----", "")
+                    .replace("-----END PRIVATE KEY-----", "")
+                    .replaceAll("\\s+", "");
+            byte[] keyBytes = Base64.decode(rawKey, Base64.DEFAULT);
+            PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(keyBytes);
+            PrivateKey privateKey = KeyFactory.getInstance("RSA").generatePrivate(spec);
+            Signature sig = Signature.getInstance("SHA256withRSA");
+            sig.initSign(privateKey);
+            sig.update(signingInput.getBytes(StandardCharsets.UTF_8));
+            String signature = Base64.encodeToString(
+                    sig.sign(), Base64.URL_SAFE | Base64.NO_PADDING | Base64.NO_WRAP);
+
+            String jwt = signingInput + "." + signature;
+
+            // Exchange JWT for access token
+            RequestBody tokenBody = new okhttp3.FormBody.Builder()
+                    .add("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer")
+                    .add("assertion", jwt)
+                    .build();
+
+            Request tokenRequest = new Request.Builder()
+                    .url("https://oauth2.googleapis.com/token")
+                    .post(tokenBody)
+                    .build();
+
+            Response tokenResponse = client.newCall(tokenRequest).execute();
+            String tokenJson = tokenResponse.body().string();
+            JsonObject tokenObj = JsonParser.parseString(tokenJson).getAsJsonObject();
+            return tokenObj.get("access_token").getAsString();
+
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     // -------------------------------------------------------------------------
