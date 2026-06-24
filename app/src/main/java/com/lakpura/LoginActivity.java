@@ -1,6 +1,9 @@
 package com.lakpura;
 
+import android.Manifest;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
@@ -9,7 +12,10 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 
 public class LoginActivity extends AppCompatActivity {
 
@@ -18,10 +24,14 @@ public class LoginActivity extends AppCompatActivity {
     private ProgressBar progressBar;
     private TextView tvGoToRegister;
 
+    private final ActivityResultLauncher<String> notifPermissionLauncher =
+            registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {});
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_login);
+        requestNotificationPermission();
 
         etEmail        = findViewById(R.id.etEmail);
         etPassword     = findViewById(R.id.etPassword);
@@ -64,6 +74,15 @@ public class LoginActivity extends AppCompatActivity {
                 Toast.makeText(LoginActivity.this, error, Toast.LENGTH_LONG).show();
             }
         });
+    }
+
+    private void requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                    != PackageManager.PERMISSION_GRANTED) {
+                notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS);
+            }
+        }
     }
 
     private void setLoading(boolean loading) {
