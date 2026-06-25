@@ -59,7 +59,7 @@
             android:layout_height="48dp"
             android:hint="Search by name or phone..."
             android:inputType="text"
-            android:background="@drawable/edit_text_bg"
+            android:background="@android:drawable/edit_text"
             android:paddingStart="16dp"
             android:paddingEnd="16dp"
             android:textSize="14sp"/>
