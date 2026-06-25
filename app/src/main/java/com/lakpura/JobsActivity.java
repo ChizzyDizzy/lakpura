@@ -2,7 +2,10 @@ package com.lakpura;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.View;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -11,6 +14,7 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.cardview.widget.CardView;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class JobsActivity extends AppCompatActivity {
@@ -19,9 +23,11 @@ public class JobsActivity extends AppCompatActivity {
     private ProgressBar progressBar;
     private TextView tvEmpty;
     private TextView tvHeader;
+    private EditText etSearch;
 
     private String customerId;
     private String customerName;
+    private List<AuthHelper.JobItem> allJobs = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -32,6 +38,7 @@ public class JobsActivity extends AppCompatActivity {
         progressBar = findViewById(R.id.progressBar);
         tvEmpty     = findViewById(R.id.tvEmpty);
         tvHeader    = findViewById(R.id.tvHeader);
+        etSearch    = findViewById(R.id.etSearch);
 
         customerId   = getIntent().getStringExtra("customer_id");
         customerName = getIntent().getStringExtra("customer_name");
@@ -41,6 +48,14 @@ public class JobsActivity extends AppCompatActivity {
         }
 
         findViewById(R.id.btnBack).setOnClickListener(v -> finish());
+
+        etSearch.addTextChangedListener(new TextWatcher() {
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                filterJobs(s.toString().trim());
+            }
+            public void afterTextChanged(Editable s) {}
+        });
 
         loadJobs();
     }
@@ -54,13 +69,8 @@ public class JobsActivity extends AppCompatActivity {
             @Override
             public void onSuccess(List<AuthHelper.JobItem> items) {
                 progressBar.setVisibility(View.GONE);
-                if (items.isEmpty()) {
-                    tvEmpty.setVisibility(View.VISIBLE);
-                    return;
-                }
-                for (AuthHelper.JobItem job : items) {
-                    addJobCard(job);
-                }
+                allJobs = items;
+                filterJobs(etSearch.getText().toString().trim());
             }
 
             @Override
@@ -71,60 +81,108 @@ public class JobsActivity extends AppCompatActivity {
         });
     }
 
+    private void filterJobs(String query) {
+        llJobs.removeAllViews();
+        List<AuthHelper.JobItem> filtered = new ArrayList<>();
+        for (AuthHelper.JobItem j : allJobs) {
+            if (query.isEmpty()
+                    || j.title.toLowerCase().contains(query.toLowerCase())
+                    || j.customerName.toLowerCase().contains(query.toLowerCase())
+                    || j.status.toLowerCase().contains(query.toLowerCase())) {
+                filtered.add(j);
+            }
+        }
+        if (filtered.isEmpty()) {
+            tvEmpty.setVisibility(View.VISIBLE);
+        } else {
+            tvEmpty.setVisibility(View.GONE);
+            for (AuthHelper.JobItem job : filtered) {
+                addJobCard(job);
+            }
+        }
+    }
+
     private void addJobCard(AuthHelper.JobItem item) {
         CardView card = new CardView(this);
         LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT);
-        cardParams.setMargins(0, 0, 0, 16);
+        cardParams.setMargins(0, 0, 0, 14);
         card.setLayoutParams(cardParams);
-        card.setRadius(16f);
-        card.setCardElevation(4f);
+        card.setRadius(12f);
+        card.setCardElevation(3f);
         card.setCardBackgroundColor(getResources().getColor(R.color.surface, null));
         card.setClickable(true);
         card.setFocusable(true);
 
         LinearLayout inner = new LinearLayout(this);
         inner.setOrientation(LinearLayout.VERTICAL);
-        inner.setPadding(40, 28, 40, 28);
+        inner.setPadding(36, 24, 36, 24);
+
+        // Status colour bar on left via horizontal wrapper
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+
+        View statusBar = new View(this);
+        LinearLayout.LayoutParams barParams = new LinearLayout.LayoutParams(8, LinearLayout.LayoutParams.MATCH_PARENT);
+        barParams.setMarginEnd(20);
+        statusBar.setLayoutParams(barParams);
+        statusBar.setBackgroundColor(statusColor(item.status));
+        statusBar.setMinimumHeight(80);
+
+        LinearLayout textBlock = new LinearLayout(this);
+        textBlock.setOrientation(LinearLayout.VERTICAL);
+        textBlock.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
         TextView tvTitle = new TextView(this);
-        tvTitle.setText(item.title);
-        tvTitle.setTextSize(16f);
+        tvTitle.setText(!item.title.isEmpty() ? item.title : "Untitled Job");
+        tvTitle.setTextSize(15f);
         tvTitle.setTextColor(getResources().getColor(R.color.text_primary, null));
         tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+        textBlock.addView(tvTitle);
 
-        TextView tvCustomer = new TextView(this);
-        tvCustomer.setText(item.customerName);
-        tvCustomer.setTextSize(13f);
-        tvCustomer.setTextColor(getResources().getColor(R.color.text_secondary, null));
-        LinearLayout.LayoutParams p1 = new LinearLayout.LayoutParams(
+        // Customer name + phone on same line
+        if (!item.customerName.isEmpty() && customerId == null) {
+            TextView tvCustomer = new TextView(this);
+            tvCustomer.setText(item.customerName);
+            tvCustomer.setTextSize(13f);
+            tvCustomer.setTextColor(getResources().getColor(R.color.text_secondary, null));
+            LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            cp.setMargins(0, 4, 0, 0);
+            tvCustomer.setLayoutParams(cp);
+            textBlock.addView(tvCustomer);
+        }
+
+        // Status + date on same line
+        LinearLayout bottomRow = new LinearLayout(this);
+        bottomRow.setOrientation(LinearLayout.HORIZONTAL);
+        bottomRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams brp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        p1.setMargins(0, 4, 0, 0);
-        tvCustomer.setLayoutParams(p1);
+        brp.setMargins(0, 6, 0, 0);
+        bottomRow.setLayoutParams(brp);
 
         TextView tvStatus = new TextView(this);
         tvStatus.setText(formatStatus(item.status));
         tvStatus.setTextSize(12f);
         tvStatus.setTextColor(statusColor(item.status));
-        LinearLayout.LayoutParams p2 = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        p2.setMargins(0, 6, 0, 0);
-        tvStatus.setLayoutParams(p2);
+        tvStatus.setTypeface(null, android.graphics.Typeface.BOLD);
+        bottomRow.addView(tvStatus);
 
-        TextView tvDate = new TextView(this);
-        tvDate.setText(item.scheduledDate.isEmpty() ? "" : "Scheduled: " + item.scheduledDate);
-        tvDate.setTextSize(12f);
-        tvDate.setTextColor(getResources().getColor(R.color.text_secondary, null));
-        LinearLayout.LayoutParams p3 = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        p3.setMargins(0, 4, 0, 0);
-        tvDate.setLayoutParams(p3);
+        if (!item.scheduledDate.isEmpty()) {
+            TextView tvDate = new TextView(this);
+            tvDate.setText("  ·  " + item.scheduledDate);
+            tvDate.setTextSize(12f);
+            tvDate.setTextColor(getResources().getColor(R.color.text_secondary, null));
+            bottomRow.addView(tvDate);
+        }
 
-        inner.addView(tvTitle);
-        if (!item.customerName.isEmpty() && customerId == null) inner.addView(tvCustomer);
-        inner.addView(tvStatus);
-        if (!item.scheduledDate.isEmpty()) inner.addView(tvDate);
+        textBlock.addView(bottomRow);
+        row.addView(statusBar);
+        row.addView(textBlock);
+        inner.addView(row);
         card.addView(inner);
 
         card.setOnClickListener(v -> {
@@ -143,10 +201,10 @@ public class JobsActivity extends AppCompatActivity {
 
     private String formatStatus(String status) {
         switch (status) {
-            case "in_progress": return "● In Progress";
-            case "completed":   return "✓ Completed";
-            case "cancelled":   return "✕ Cancelled";
-            default:            return "○ Open";
+            case "in_progress": return "In Progress";
+            case "completed":   return "Completed";
+            case "cancelled":   return "Cancelled";
+            default:            return "Open";
         }
     }
 
