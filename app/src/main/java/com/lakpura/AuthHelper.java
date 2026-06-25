@@ -247,11 +247,11 @@ public class AuthHelper {
                 List<CustomerItem> items = new ArrayList<>();
                 for (JsonElement el : arr) {
                     JsonObject obj = el.getAsJsonObject();
-                    String id      = obj.has("id")      ? obj.get("id").getAsString()      : "";
-                    String name    = obj.has("name")    ? obj.get("name").getAsString()    : "";
-                    String phone   = obj.has("phone")   ? obj.get("phone").getAsString()   : "";
-                    String email   = obj.has("email")   ? obj.get("email").getAsString()   : "";
-                    String address = obj.has("address") ? obj.get("address").getAsString() : "";
+                    String id      = str(obj, "id");
+                    String name    = str(obj, "name");
+                    String phone   = str(obj, "phone");
+                    String email   = str(obj, "email");
+                    String address = str(obj, "address");
                     items.add(new CustomerItem(id, name, phone, email, address));
                 }
 
@@ -297,12 +297,12 @@ public class AuthHelper {
                 List<JobItem> items = new ArrayList<>();
                 for (JsonElement el : arr) {
                     JsonObject obj = el.getAsJsonObject();
-                    String id            = obj.has("id")             ? obj.get("id").getAsString()             : "";
-                    String title         = obj.has("title")          ? obj.get("title").getAsString()          : "";
-                    String status        = obj.has("status")         ? obj.get("status").getAsString()         : "open";
-                    String customerName  = obj.has("customer_name")  ? obj.get("customer_name").getAsString()  : "";
-                    String scheduledDate = obj.has("scheduled_date") ? obj.get("scheduled_date").getAsString() : "";
-                    String notes         = obj.has("notes")          ? obj.get("notes").getAsString()          : "";
+                    String id            = str(obj, "id");
+                    String title         = str(obj, "title");
+                    String status        = str(obj, "status").isEmpty() ? "open" : str(obj, "status");
+                    String customerName  = str(obj, "customer_name");
+                    String scheduledDate = str(obj, "scheduled_date");
+                    String notes         = str(obj, "notes");
                     items.add(new JobItem(id, title, status, customerName, scheduledDate, notes));
                 }
 
@@ -576,6 +576,11 @@ public class AuthHelper {
         currentUserEmail = null;
         currentUserName = null;
         currentIsAdmin = false;
+    }
+
+    private static String str(JsonObject obj, String key) {
+        if (!obj.has(key) || obj.get(key).isJsonNull()) return "";
+        return obj.get(key).getAsString();
     }
 
     private static String extractError(String responseBody) {

@@ -114,7 +114,7 @@ public class CustomersActivity extends AppCompatActivity {
         tvName.setTypeface(null, android.graphics.Typeface.BOLD);
 
         TextView tvPhone = new TextView(this);
-        tvPhone.setText(item.phone.isEmpty() ? "No phone" : item.phone);
+        tvPhone.setText(item.phone);
         tvPhone.setTextSize(13f);
         tvPhone.setTextColor(getResources().getColor(R.color.text_secondary, null));
         LinearLayout.LayoutParams phoneParams = new LinearLayout.LayoutParams(
