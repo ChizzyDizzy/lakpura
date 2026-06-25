@@ -25,6 +25,10 @@
         <activity android:name=".HomeActivity" android:exported="false"/>
         <activity android:name=".AdminActivity" android:exported="false"/>
         <activity android:name=".NotificationsActivity" android:exported="false"/>
+        <activity android:name=".CustomersActivity" android:exported="false"/>
+        <activity android:name=".CustomerDetailActivity" android:exported="false"/>
+        <activity android:name=".JobsActivity" android:exported="false"/>
+        <activity android:name=".JobDetailActivity" android:exported="false"/>
 
         <service
             android:name=".LakpuraMessagingService"

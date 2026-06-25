@@ -48,12 +48,45 @@ public class AuthHelper {
         void onError(String error);
     }
 
+    public interface CustomersCallback {
+        void onSuccess(List<CustomerItem> items);
+        void onError(String error);
+    }
+
+    public interface JobsCallback {
+        void onSuccess(List<JobItem> items);
+        void onError(String error);
+    }
+
     public static class NotificationItem {
         public String subject, message, sentAt;
         public NotificationItem(String subject, String message, String sentAt) {
             this.subject = subject;
             this.message = message;
             this.sentAt  = sentAt;
+        }
+    }
+
+    public static class CustomerItem {
+        public String id, name, phone, email, address;
+        public CustomerItem(String id, String name, String phone, String email, String address) {
+            this.id      = id;
+            this.name    = name;
+            this.phone   = phone;
+            this.email   = email;
+            this.address = address;
+        }
+    }
+
+    public static class JobItem {
+        public String id, title, status, customerName, scheduledDate, notes;
+        public JobItem(String id, String title, String status, String customerName, String scheduledDate, String notes) {
+            this.id            = id;
+            this.title         = title;
+            this.status        = status;
+            this.customerName  = customerName;
+            this.scheduledDate = scheduledDate;
+            this.notes         = notes;
         }
     }
 
@@ -186,6 +219,139 @@ public class AuthHelper {
     }
 
     // -------------------------------------------------------------------------
+    // Get customers
+    // -------------------------------------------------------------------------
+    public static void getCustomers(CustomersCallback callback) {
+        executor.execute(() -> {
+            try {
+                Request request = new Request.Builder()
+                        .url(ApiClient.BASE_URL + "/customers")
+                        .addHeader("Authorization", "Bearer " + accessToken)
+                        .get()
+                        .build();
+
+                Response response = client.newCall(request).execute();
+                String responseBody = response.body().string();
+
+                if (response.code() == 401) {
+                    handleSessionExpired();
+                    mainHandler.post(() -> callback.onError("Session expired. Please log in again."));
+                    return;
+                }
+                if (!response.isSuccessful()) {
+                    mainHandler.post(() -> callback.onError("Could not load customers."));
+                    return;
+                }
+
+                JsonArray arr = JsonParser.parseString(responseBody).getAsJsonArray();
+                List<CustomerItem> items = new ArrayList<>();
+                for (JsonElement el : arr) {
+                    JsonObject obj = el.getAsJsonObject();
+                    String id      = obj.has("id")      ? obj.get("id").getAsString()      : "";
+                    String name    = obj.has("name")    ? obj.get("name").getAsString()    : "";
+                    String phone   = obj.has("phone")   ? obj.get("phone").getAsString()   : "";
+                    String email   = obj.has("email")   ? obj.get("email").getAsString()   : "";
+                    String address = obj.has("address") ? obj.get("address").getAsString() : "";
+                    items.add(new CustomerItem(id, name, phone, email, address));
+                }
+
+                mainHandler.post(() -> callback.onSuccess(items));
+
+            } catch (IOException e) {
+                mainHandler.post(() -> callback.onError("Network error: " + e.getMessage()));
+            }
+        });
+    }
+
+    // -------------------------------------------------------------------------
+    // Get jobs (customerId may be null for all jobs)
+    // -------------------------------------------------------------------------
+    public static void getJobs(String customerId, JobsCallback callback) {
+        executor.execute(() -> {
+            try {
+                String url = ApiClient.BASE_URL + "/jobs";
+                if (customerId != null && !customerId.isEmpty()) {
+                    url += "?customer_id=" + customerId;
+                }
+
+                Request request = new Request.Builder()
+                        .url(url)
+                        .addHeader("Authorization", "Bearer " + accessToken)
+                        .get()
+                        .build();
+
+                Response response = client.newCall(request).execute();
+                String responseBody = response.body().string();
+
+                if (response.code() == 401) {
+                    handleSessionExpired();
+                    mainHandler.post(() -> callback.onError("Session expired. Please log in again."));
+                    return;
+                }
+                if (!response.isSuccessful()) {
+                    mainHandler.post(() -> callback.onError("Could not load jobs."));
+                    return;
+                }
+
+                JsonArray arr = JsonParser.parseString(responseBody).getAsJsonArray();
+                List<JobItem> items = new ArrayList<>();
+                for (JsonElement el : arr) {
+                    JsonObject obj = el.getAsJsonObject();
+                    String id            = obj.has("id")             ? obj.get("id").getAsString()             : "";
+                    String title         = obj.has("title")          ? obj.get("title").getAsString()          : "";
+                    String status        = obj.has("status")         ? obj.get("status").getAsString()         : "open";
+                    String customerName  = obj.has("customer_name")  ? obj.get("customer_name").getAsString()  : "";
+                    String scheduledDate = obj.has("scheduled_date") ? obj.get("scheduled_date").getAsString() : "";
+                    String notes         = obj.has("notes")          ? obj.get("notes").getAsString()          : "";
+                    items.add(new JobItem(id, title, status, customerName, scheduledDate, notes));
+                }
+
+                mainHandler.post(() -> callback.onSuccess(items));
+
+            } catch (IOException e) {
+                mainHandler.post(() -> callback.onError("Network error: " + e.getMessage()));
+            }
+        });
+    }
+
+    // -------------------------------------------------------------------------
+    // Update job status
+    // -------------------------------------------------------------------------
+    public static void updateJobStatus(String jobId, String status, AuthCallback callback) {
+        executor.execute(() -> {
+            try {
+                JsonObject body = new JsonObject();
+                body.addProperty("status", status);
+
+                Request request = new Request.Builder()
+                        .url(ApiClient.BASE_URL + "/jobs/" + jobId)
+                        .addHeader("Authorization", "Bearer " + accessToken)
+                        .addHeader("Content-Type", "application/json")
+                        .patch(RequestBody.create(body.toString(), JSON))
+                        .build();
+
+                Response response = client.newCall(request).execute();
+
+                if (response.code() == 401) {
+                    handleSessionExpired();
+                    mainHandler.post(() -> callback.onError("Session expired. Please log in again."));
+                    return;
+                }
+                if (!response.isSuccessful()) {
+                    String rb = response.body().string();
+                    mainHandler.post(() -> callback.onError(extractError(rb)));
+                    return;
+                }
+
+                mainHandler.post(() -> callback.onSuccess("Status updated successfully"));
+
+            } catch (IOException e) {
+                mainHandler.post(() -> callback.onError("Network error: " + e.getMessage()));
+            }
+        });
+    }
+
+    // -------------------------------------------------------------------------
     // Get user count (admin only)
     // -------------------------------------------------------------------------
     public static void getUserCount(UserCountCallback callback) {
@@ -221,7 +387,7 @@ public class AuthHelper {
     }
 
     // -------------------------------------------------------------------------
-    // Send notification (Phase 3)
+    // Send notification (admin only)
     // -------------------------------------------------------------------------
     public static void sendInAppNotification(String subject, String message, AuthCallback callback) {
         executor.execute(() -> {
@@ -264,7 +430,7 @@ public class AuthHelper {
     }
 
     // -------------------------------------------------------------------------
-    // Create user (Phase 3)
+    // Create user (admin only)
     // -------------------------------------------------------------------------
     public static void createUser(String email, String password, String fullName, boolean makeAdmin, AuthCallback callback) {
         executor.execute(() -> {

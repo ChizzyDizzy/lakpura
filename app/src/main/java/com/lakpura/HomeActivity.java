@@ -14,13 +14,21 @@ public class HomeActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_home);
 
-        TextView tvWelcome        = findViewById(R.id.tvWelcome);
-        Button btnLogout          = findViewById(R.id.btnLogout);
-        Button btnNotifications   = findViewById(R.id.btnNotifications);
+        TextView tvWelcome      = findViewById(R.id.tvWelcome);
+        Button btnLogout        = findViewById(R.id.btnLogout);
+        Button btnNotifications = findViewById(R.id.btnNotifications);
+        Button btnCustomers     = findViewById(R.id.btnCustomers);
+        Button btnJobs          = findViewById(R.id.btnJobs);
 
         String name = AuthHelper.currentUserName != null
                 ? AuthHelper.currentUserName : "User";
         tvWelcome.setText("Welcome,\n" + name + "!");
+
+        btnCustomers.setOnClickListener(v ->
+                startActivity(new Intent(this, CustomersActivity.class)));
+
+        btnJobs.setOnClickListener(v ->
+                startActivity(new Intent(this, JobsActivity.class)));
 
         btnNotifications.setOnClickListener(v ->
                 startActivity(new Intent(this, NotificationsActivity.class)));
