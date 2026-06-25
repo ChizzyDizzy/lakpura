@@ -18,9 +18,9 @@ public class HomeActivity extends AppCompatActivity {
         Button btnLogout          = findViewById(R.id.btnLogout);
         Button btnNotifications   = findViewById(R.id.btnNotifications);
 
-        String email = AuthHelper.currentUserEmail != null
-                ? AuthHelper.currentUserEmail : "User";
-        tvWelcome.setText("Welcome,\n" + email + "!");
+        String name = AuthHelper.currentUserName != null
+                ? AuthHelper.currentUserName : "User";
+        tvWelcome.setText("Welcome,\n" + name + "!");
 
         btnNotifications.setOnClickListener(v ->
                 startActivity(new Intent(this, NotificationsActivity.class)));

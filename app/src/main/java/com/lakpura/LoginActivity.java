@@ -20,9 +20,8 @@ import androidx.core.content.ContextCompat;
 public class LoginActivity extends AppCompatActivity {
 
     private EditText etEmail, etPassword;
-    private Button btnLogin, btnAdminLogin;
+    private Button btnLogin;
     private ProgressBar progressBar;
-    private TextView tvGoToRegister;
 
     private final ActivityResultLauncher<String> notifPermissionLauncher =
             registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {});
@@ -33,19 +32,21 @@ public class LoginActivity extends AppCompatActivity {
         setContentView(R.layout.activity_login);
         requestNotificationPermission();
 
-        etEmail        = findViewById(R.id.etEmail);
-        etPassword     = findViewById(R.id.etPassword);
-        btnLogin       = findViewById(R.id.btnLogin);
-        btnAdminLogin  = findViewById(R.id.btnAdminLogin);
-        progressBar    = findViewById(R.id.progressBar);
-        tvGoToRegister = findViewById(R.id.tvGoToRegister);
+        etEmail    = findViewById(R.id.etEmail);
+        etPassword = findViewById(R.id.etPassword);
+        btnLogin   = findViewById(R.id.btnLogin);
+        progressBar = findViewById(R.id.progressBar);
 
-        btnLogin.setOnClickListener(v -> attemptLogin(false));
-        btnAdminLogin.setOnClickListener(v -> attemptLogin(true));
-        tvGoToRegister.setOnClickListener(v -> startActivity(new Intent(this, RegisterActivity.class)));
+        // Hide register link and admin button — no self-registration in ERP system
+        View tvGoToRegister = findViewById(R.id.tvGoToRegister);
+        if (tvGoToRegister != null) tvGoToRegister.setVisibility(View.GONE);
+        View btnAdminLogin = findViewById(R.id.btnAdminLogin);
+        if (btnAdminLogin != null) btnAdminLogin.setVisibility(View.GONE);
+
+        btnLogin.setOnClickListener(v -> attemptLogin());
     }
 
-    private void attemptLogin(boolean goToAdmin) {
+    private void attemptLogin() {
         String email    = etEmail.getText().toString().trim();
         String password = etPassword.getText().toString().trim();
 
@@ -56,11 +57,11 @@ public class LoginActivity extends AppCompatActivity {
 
         setLoading(true);
 
-        AuthHelper.login(email, password, new AuthHelper.AuthCallback() {
+        AuthHelper.login(email, password, new AuthHelper.LoginCallback() {
             @Override
-            public void onSuccess(String message) {
+            public void onSuccess(boolean isAdmin) {
                 setLoading(false);
-                if (goToAdmin) {
+                if (isAdmin) {
                     startActivity(new Intent(LoginActivity.this, AdminActivity.class));
                 } else {
                     startActivity(new Intent(LoginActivity.this, HomeActivity.class));
@@ -88,6 +89,5 @@ public class LoginActivity extends AppCompatActivity {
     private void setLoading(boolean loading) {
         progressBar.setVisibility(loading ? View.VISIBLE : View.GONE);
         btnLogin.setEnabled(!loading);
-        btnAdminLogin.setEnabled(!loading);
     }
 }
