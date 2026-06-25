@@ -100,8 +100,6 @@ public class CustomersActivity extends AppCompatActivity {
         card.setRadius(16f);
         card.setCardElevation(4f);
         card.setCardBackgroundColor(getResources().getColor(R.color.surface, null));
-        card.setForeground(getResources().getDrawable(android.R.attr.selectableItemBackground > 0
-                ? android.R.attr.selectableItemBackground : 0, null));
         card.setClickable(true);
         card.setFocusable(true);
 
